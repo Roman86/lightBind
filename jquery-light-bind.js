@@ -174,7 +174,7 @@
 		},
 
 		_linkElement: function(settings, $boundAll){
-			// todo: update model without extra element update
+			var mutualUpdateBlock = false;
 
 			var $element = $(this);
 			var objKey = $element.attr('data-bind');
@@ -191,16 +191,27 @@
 			}
 
 			methods._addObjValueSetter(settings, objKey, function(prop, lastVal, newVal){
-				setTimeout(function(){
-					var val = methods._processValue($element, settings, objKey);
-					methods._updateElementValue($element, val, $boundAll);
-					console.log("update element", val);
+				setTimeout(function () {
+					if (mutualUpdateBlock) {
+						mutualUpdateBlock = false;
+					} else {
+						mutualUpdateBlock = true;
+						var val = methods._processValue($element, settings, objKey);
+						methods._updateElementValue($element, val, $boundAll);
+						console.log("update element", val);
+					}
 				}, 1);
 				return newVal;
 			});
 
 			function updateModel(val) {
-				methods._processValue(this, settings, objKey, val);
+				if (mutualUpdateBlock) {
+					mutualUpdateBlock = false;
+				} else {
+					mutualUpdateBlock = true;
+					console.log("update model", val);
+					methods._processValue(this, settings, objKey, val);
+				}
 			}
 
 			if ($element.is('input[type=checkbox]')) {
@@ -208,8 +219,13 @@
 					updateModel(!!$(this).prop('checked'));
 				});
 			} else {
+				var lastVal = '';
 				$element.on(genEventsKeys('change keyup input'), function () {
-					updateModel($(this).val());
+					var val = $(this).val();
+					if (val == lastVal)
+						return;
+					updateModel(val);
+					lastVal = val;
 				});
 			}
 		},
