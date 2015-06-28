@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+  <meta charset="UTF-8">
+  <title>lightBind test</title>
+
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
+    <script type="text/javascript" src="jquery-light-bind.js"></script>
+    <script type="text/javascript">
+        $(function(){
+            window.testData = {
+                'opt-type': 'hey',
+                'str': 'hop-hey-la-la-ley',
+                check: true,
+                range: 70,
+                a: 'http://google.com',
+                'static': 'just an <strong>html</strong>',
+                text: 'multi\nline\ntext'
+            };
+
+            $('body').lightBind({
+                data: window.testData,
+                processors: {
+                    staticProcessor: function(element, getter, setter, newValue){
+                        if (typeof(newValue) != 'undefined'){
+                            setter(newValue);
+                        } else{
+                            return getter().replace(/an.+html\S+/, 'a text');
+                        }
+                    }
+                }
+            });
+
+            $('.destroyBtn').on('click', function(){
+                $('body').lightBind('destroy');
+            });
+        });
+    </script>
+
+</head>
+<body>
+<label>
+    <input type="radio" name="opt-type" data-bind="opt-type" value="hop">option 1
+</label><br>
+<label>
+    <input type="radio" name="opt-type" data-bind="opt-type" value="hey">option 2
+</label><br>
+<label>
+    <input type="radio" name="opt-type" data-bind="opt-type" value="la-la-ley">option 3
+</label><br>
+<label>
+    str
+    <input type="text" name="test" data-bind="str"/>
+</label><br>
+<label>
+    check
+    <input type="checkbox" name="test" data-bind="check"/>
+</label><br>
+<label>
+    range
+    <input type="range" name="range" data-bind="range"/>
+</label><br>
+link: <a href="http://ya.ru" data-bind="a">http://ya.ru</a> (originally http://ya.ru)<br>
+static text: <span data-bind="static" data-bind-processor="staticProcessor">some text to be replaced goes here</span><br>
+<label>
+    textarea:<br>
+    <textarea data-bind="text" rows="5"></textarea>
+</label>
+<br>
+<button class="destroyBtn">destroy</button>
+</body>
+</html>
