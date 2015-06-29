@@ -69,8 +69,12 @@
 			var settings = $.extend({
 				data: {},
 				processors: {},
-				initializeElements: true
+				initializeElements: true,
+				onDataUpdate: null,
+				onViewUpdate: null
 			}, options);
+
+			settings.blocks = {}; // to block mutual updates
 
 			//console.debug('.lightBind', this);
 			this.each(function(){
@@ -82,7 +86,7 @@
 
 					var $boundAll = methods._boundElements.call($root);
 					$boundAll.each(function(){
-						methods._linkElement.call(this, settings, $boundAll);
+						methods._linkElement(this, settings, $boundAll);
 					});
 				}
 			});
@@ -93,10 +97,21 @@
 		},
 
 		destroy: function(){
-			var $boundAll = methods._boundElements.call(this);
-			// todo: data unwatch()
+			return this.each(function() {
+				var $root = $(this);
+				var data = $root.data(jQueryDataKey);
+				if (!data)
+					return; // not initialized
+				var settings = data.settings;
+				var $boundAll = methods._boundElements.call($root);
+				$boundAll.each(function () {
+					methods._unlinkElement(this, settings);
+				});
 
-			$boundAll.unbind('.'+jQueryDataKey);
+				$boundAll.off('.' + jQueryDataKey);
+
+				$root.data(jQueryDataKey, null);
+			});
 		},
 
 		updateView: function(){
@@ -141,6 +156,8 @@
 			} else if ($element.is('a')){
 				//console.warn('link found', element);
 				$element.attr('href', value).html(value);
+			} else if ($element.is('textarea')) {
+				$element.val(value);
 			} else {
 				//console.warn('other element found', element);
 				$element.html(value);
@@ -173,11 +190,10 @@
 			}
 		},
 
-		_linkElement: function(settings, $boundAll){
-			var mutualUpdateBlock = false;
-
-			var $element = $(this);
+		_linkElement: function(element, settings, $boundAll){
+			var $element = $(element);
 			var objKey = $element.attr('data-bind');
+			delete settings.blocks[objKey];
 
 			function genEventsKeys(events) {
 				if (events){
@@ -190,44 +206,61 @@
 				}
 			}
 
-			methods._addObjValueSetter(settings, objKey, function(prop, lastVal, newVal){
-				setTimeout(function () {
-					if (mutualUpdateBlock) {
-						mutualUpdateBlock = false;
-					} else {
-						mutualUpdateBlock = true;
-						var val = methods._processValue($element, settings, objKey);
-						methods._updateElementValue($element, val, $boundAll);
-						console.log("update element", val);
-					}
-				}, 1);
-				return newVal;
-			});
-
 			function updateModel(val) {
-				if (mutualUpdateBlock) {
-					mutualUpdateBlock = false;
+				if (settings.blocks[objKey]) {
+						delete settings.blocks[objKey];
 				} else {
-					mutualUpdateBlock = true;
-					console.log("update model", val);
-					methods._processValue(this, settings, objKey, val);
+					settings.blocks[objKey] = true;
+					methods._processValue(element, settings, objKey, val);
+					if ($.isFunction(settings.onDataUpdate))
+						settings.onDataUpdate(element, objKey, val);
 				}
 			}
+
+			methods._addObjValueSetter(settings, objKey, function(prop, lastVal, newVal){
+				if (settings.blocks[objKey]) {
+					delete settings.blocks[objKey];
+				} else {
+					setTimeout(function () {
+							settings.blocks[objKey] = true;
+							var val = methods._processValue(element, settings, objKey);
+							methods._updateElementValue(element, val, $boundAll);
+							if ($.isFunction(settings.onViewUpdate))
+								settings.onViewUpdate(element, objKey, newVal);
+							settings.blocks[objKey] = false;
+						}, 1
+					);
+				}
+				return newVal;
+			});
 
 			if ($element.is('input[type=checkbox]')) {
 				$element.on(genEventsKeys('change'), function(){
 					updateModel(!!$(this).prop('checked'));
 				});
 			} else {
-				var lastVal = '';
-				$element.on(genEventsKeys('change keyup input'), function () {
+				var lastVal = null;
+				var isRadio = $element.is('input[type=radio]');
+				var events = genEventsKeys('change keyup input');
+				$element.off(events);
+				$element.on(events, function () {
 					var val = $(this).val();
-					if (val == lastVal)
-						return;
-					updateModel(val);
-					lastVal = val;
+					if (isRadio) {
+						updateModel(val);
+					} else {
+						if (val == lastVal && lastVal != null)
+							return;
+						updateModel(val);
+						lastVal = val;
+					}
 				});
 			}
+		},
+
+		_unlinkElement: function(element, settings){
+			var $element = $(element);
+			var objKey = $element.attr('data-bind');
+			methods._removeObjValueSetter(settings, objKey);
 		},
 
 		_getObjValue: function(data, pathStr){
@@ -257,18 +290,32 @@
 			obj[lastKey] = value;
 		},
 
-		_addObjValueSetter: function(settings, pathStr, setter){
+		_addObjValueSetter: function(settings, pathStr, setter) {
 			if (!settings || !settings.data)
 				return null;
 			var obj = settings.data;
 			var path = pathStr.split('.');
-			var lastKey = path[path.length-1];
-			for (var i = 0, cnt = path.length; i < cnt-1; i++){
+			var lastKey = path[path.length - 1];
+			for (var i = 0, cnt = path.length; i < cnt - 1; i++) {
 				if (!obj)
 					break;
 				obj = obj[path[i]];
 			}
 			obj.watch(lastKey, setter);
+		},
+
+		_removeObjValueSetter: function(settings, pathStr){
+			if (!settings || !settings.data)
+				return null;
+			var obj = settings.data;
+			var path = pathStr.split('.');
+			var lastKey = path[path.length - 1];
+			for (var i = 0, cnt = path.length; i < cnt - 1; i++) {
+				if (!obj)
+					break;
+				obj = obj[path[i]];
+			}
+			obj.unwatch(lastKey);
 		}
 	};
 

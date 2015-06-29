@@ -4,69 +4,193 @@
   <meta charset="UTF-8">
   <title>lightBind test</title>
 
-    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css"/>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
     <script type="text/javascript" src="jquery-light-bind.js"></script>
     <script type="text/javascript">
-        $(function(){
-            window.testData = {
-                'opt-type': 'hey',
-                'str': 'hop-hey-la-la-ley',
-                check: true,
-                range: 70,
-                a: 'http://google.com',
-                'static': 'just an <strong>html</strong>',
-                text: 'multi\nline\ntext'
-            };
 
-            $('body').lightBind({
-                data: window.testData,
-                processors: {
-                    staticProcessor: function(element, getter, setter, newValue){
-                        if (typeof(newValue) != 'undefined'){
-                            setter(newValue);
-                        } else{
-                            return getter().replace(/an.+html\S+/, 'a text');
+        function updateDataEditor(){
+            $('#dataEditor').val(JSON.stringify(window.testData, null, "\t"));
+        }
+
+        function log(str){
+            var $logs = $('#logs');
+            var $rec = $('<div class="logRec">');
+            $rec.html(str);
+            $rec.css('opacity', 1);
+            $rec.animate({
+                opacity: 0
+            }, 10000, function(){
+                $rec.remove();
+            });
+            $logs.prepend($rec);
+        }
+
+        window.testData = {
+            'opt-type': 'hey',
+            'str': 'hop-hey-la-la-ley',
+            check: true,
+            range: 70,
+            a: 'http://google.com',
+            'static': 'just a text',
+            text: 'multi\nline\ntext'
+        };
+
+        $(function(){
+            var initialized = false;
+
+            var $view = $('#view');
+            var $panel = $('.panel-body');
+            var $editor = $('#dataEditor');
+
+            function bindIt() {
+                initialized = true;
+                $view.lightBind({
+                    data: window.testData,
+                    processors: {
+                        staticProcessor: function (element, getter, setter, newValue) {
+                            if (typeof(newValue) != 'undefined') {
+                                setter(newValue);
+                            } else {
+                                return getter().replace(/a text/, 'an <strong>html</strong>');
+                            }
                         }
+                    },
+                    onDataUpdate: function (element, key, val) {
+                        updateDataEditor();
+                        log('data updated: [' + key + ']=' + val);
+                    },
+                    onViewUpdate: function (element, key, val) {
+                        log('view updated: [' + key + ']=' + val);
                     }
+                });
+                $panel.css('backgroundColor', '');
+            }
+
+            function unbindIt(){
+                $view.lightBind('destroy');
+                $panel.css('backgroundColor', '#eee');
+            }
+
+            $editor.on('change keyup', function(){
+                var $this = $(this);
+                try {
+                    // we should compare each value to avoid extra updates in this demo while taking
+                    // whole object from textarea string
+                    var oldObj = window.testData;
+                    var newObj = JSON.parse($this.val());
+                    for(var f in newObj){
+                        if (!newObj.hasOwnProperty(f))
+                            continue;
+                        if (oldObj[f] != newObj[f])
+                            oldObj[f] = newObj[f];
+                    }
+                    $this.css('backgroundColor', '')
+                }catch(e){
+                    $this.css('backgroundColor', '#fee')
                 }
             });
 
-            $('.destroyBtn').on('click', function(){
-                $('body').lightBind('destroy');
+            $panel.on('click', function(e){
+                if (!initialized){
+                    log("Let's bind it first");
+                    e.stopPropagation();
+                    e.preventDefault();
+                }
             });
+
+            $('#bindBtn').on('click', function(){
+                bindIt();
+            });
+
+            $('#destroyBtn').on('click', function(){
+                unbindIt();
+            });
+
+            updateDataEditor();
+            unbindIt();
         });
     </script>
 
+    <style type="text/css">
+        body{
+            width: 780px;
+            margin: 0 auto;
+        }
+
+        .jumbo{
+            padding: 20px;
+        }
+
+        #logs{
+            width: 100%;
+            height: 100px;
+            border: 1px solid #ccc;
+            overflow: hidden;
+        }
+        .logRec{
+            border: 1px solid #166dea;
+            background-color: #bbdcff;
+            color: #00346d;
+            padding: 2px;
+            margin: 3px;
+        }
+    </style>
+
 </head>
 <body>
-<label>
-    <input type="radio" name="opt-type" data-bind="opt-type" value="hop">option 1
-</label><br>
-<label>
-    <input type="radio" name="opt-type" data-bind="opt-type" value="hey">option 2
-</label><br>
-<label>
-    <input type="radio" name="opt-type" data-bind="opt-type" value="la-la-ley">option 3
-</label><br>
-<label>
-    str
-    <input type="text" name="test" data-bind="str"/>
-</label><br>
-<label>
-    check
-    <input type="checkbox" name="test" data-bind="check"/>
-</label><br>
-<label>
-    range
-    <input type="range" name="range" data-bind="range"/>
-</label><br>
-link: <a href="http://ya.ru" data-bind="a">http://ya.ru</a> (originally http://ya.ru)<br>
-static text: <span data-bind="static" data-bind-processor="staticProcessor">some text to be replaced goes here</span><br>
-<label>
-    textarea:<br>
-    <textarea data-bind="text" rows="5"></textarea>
-</label>
-<br>
-<button class="destroyBtn">destroy</button>
+<div class="jumbotron jumbo">
+    <h1>lightBind</h1>
+    <p>Ultra lightweight two-way binding jQuery plugin!</p>
+    <button id="bindBtn" class="btn btn-success btn-lg" title="Bind it first!">bind</button>
+    <button id="destroyBtn" class="btn btn-danger btn-lg">destroy</button>
+</div>
+<div class="panel panel-info">
+    <div class="panel-heading">Playground</div>
+    <div class="panel-body">
+        <div class="row">
+            <div class="col col-xs-5">
+                <div id="view">
+                <label>
+                    <input type="radio" name="opt-type" data-bind="opt-type" value="hop">Hop!
+                </label><br>
+                <label>
+                    <input type="radio" name="opt-type" data-bind="opt-type" value="hey">Hey!
+                </label><br>
+                <label>
+                    <input type="radio" name="opt-type" data-bind="opt-type" value="la-la-ley">La-la-ley!
+                </label><br>
+                <label>
+                    str
+                    <input type="text" name="test" data-bind="str"/>
+                </label><br>
+                <label>
+                    check
+                    <input type="checkbox" name="test" data-bind="check"/>
+                </label><br>
+                <label>
+                    range
+                    <input type="range" name="range" data-bind="range"/>
+                </label><br>
+                link: <a href="http://ya.ru" data-bind="a">http://ya.ru</a> (originally http://ya.ru)<br>
+                static text: <span data-bind="static" data-bind-processor="staticProcessor">some text to be replaced goes here</span><br>
+                <label>
+                    textarea:<br>
+                    <textarea data-bind="text" rows="5"></textarea>
+                </label>
+                </div>
+            </div>
+            <div class="col col-xs-7">
+                <div>
+                    <label for="dataEditor">Data Editor</label><br><textarea rows="10" cols="50" id="dataEditor"></textarea>
+                </div>
+                <div>
+                    <label>logs:</label>
+                    <div id="logs"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>
