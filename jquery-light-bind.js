@@ -158,6 +158,8 @@
 				$element.attr('href', value).html(value);
 			} else if ($element.is('textarea')) {
 				$element.val(value);
+			} else if ($element.is('select')){
+				$element.prop('value', value);
 			} else {
 				//console.warn('other element found', element);
 				$element.html(value);
