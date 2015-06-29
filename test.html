@@ -31,10 +31,10 @@
             'str': 'hop-hey-la-la-ley',
             check: true,
             range: 70,
+            sel: 2,
             a: 'http://google.com',
             'static': 'just a text',
-            text: 'multi\nline\ntext',
-            sel: 2
+            text: 'multi\nline\ntext'
         };
 
         $(function(){
@@ -184,7 +184,7 @@
                     </select>
                 </label><br>
                 link: <a href="http://ya.ru" data-bind="a">http://ya.ru</a> (originally http://ya.ru)<br>
-                static text: <span data-bind="static" data-bind-processor="staticProcessor">some text to be replaced goes here</span><br>
+                static text (processor used): <span data-bind="static" data-bind-processor="staticProcessor">some text to be replaced goes here</span><br>
                 <label>
                     textarea:<br>
                     <textarea data-bind="text" rows="5"></textarea>
