@@ -16,11 +16,11 @@
         function log(str){
             var $logs = $('#logs');
             var $rec = $('<div class="logRec">');
-            $rec.html(str);
+            $rec.html(str.replace('\n', '\\n'));
             $rec.css('opacity', 1);
             $rec.animate({
                 opacity: 0
-            }, 10000, function(){
+            }, 30000, function(){
                 $rec.remove();
             });
             $logs.prepend($rec);
@@ -28,7 +28,8 @@
 
         window.testData = {
             'opt-type': 'hey',
-            'str': 'hop-hey-la-la-ley',
+            str: 'hop-hey-la-la-ley',
+            str_processed: 'try it',
             check: true,
             range: 70,
             sel: 2,
@@ -49,11 +50,17 @@
                 $view.lightBind({
                     data: window.testData,
                     processors: {
-                        staticProcessor: function (element, getter, setter, newValue) {
-                            if (typeof(newValue) != 'undefined') {
-                                setter(newValue);
-                            } else {
-                                return getter().replace(/a text/, 'an <strong>html</strong>');
+                        staticProcessor: {
+                            modelToView: function (element, modelValue) {
+                                return modelValue.replace(/a text/, 'an <strong>html</strong>');
+                            }
+                        },
+                        stringProc: {
+                            modelToView: function (element, modelValue) {
+                                return modelValue+'?';
+                            },
+                            viewToModel: function(element, viewValue){
+                                return viewValue+'!';
                             }
                         }
                     },
@@ -162,8 +169,12 @@
                     <input type="radio" name="opt-type" data-bind="opt-type" value="la-la-ley">La-la-ley!
                 </label><br>
                 <label>
-                    str
+                    string
                     <input type="text" name="test" data-bind="str"/>
+                </label><br>
+                <label>
+                    <abbr title="add ! to model value and ? to view">processed</abbr> string
+                    <input type="text" name="test" data-bind="str_processed" data-bind-processor="stringProc"/>
                 </label><br>
                 <label>
                     check
@@ -184,7 +195,7 @@
                     </select>
                 </label><br>
                 link: <a href="http://ya.ru" data-bind="a">http://ya.ru</a> (originally http://ya.ru)<br>
-                static text (processor used): <span data-bind="static" data-bind-processor="staticProcessor">some text to be replaced goes here</span><br>
+                static text <abbr title="processor replaces 'a text' to 'an html'">processed</abbr>: <span data-bind="static" data-bind-processor="staticProcessor">some text to be replaced goes here</span><br>
                 <label>
                     textarea:<br>
                     <textarea data-bind="text" rows="5"></textarea>

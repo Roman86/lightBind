@@ -5,7 +5,7 @@
 (function ($) {
 
 	/*
-	 * object.watch polyfill
+	 * object.watch polyfill (required for lightBind)
 	 *
 	 * 2012-04-03
 	 *
@@ -13,7 +13,6 @@
 	 * Public Domain.
 	 * NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.
 	 */
-
 // object.watch
 	if (!Object.prototype.watch) {
 		Object.defineProperty(Object.prototype, "watch", {
@@ -60,6 +59,7 @@
 	}
 
 
+	// lightBind plugin
 
 	var jQueryDataKey = 'lightBind';
 
@@ -127,7 +127,7 @@
 						var objKey = $boundCurrent.attr('data-bind');
 
 						//getting value
-						var val = methods._processValue(this, settings, objKey);
+						var val = methods._modelToViewValue(this, settings, objKey);
 						methods._updateElementValue(this, val, $boundAll);
 					});
 				}
@@ -166,30 +166,46 @@
 			}
 		},
 
-		_processValue: function(element, settings, objKey, elementValueToUpdateModel){
-			var $boundCurrent = $(element);
-			var processorKey = $boundCurrent.attr('data-bind-processor');
+		_getProcessor: function(element, settings){
+			var $element = $(element);
+			var processorKey = $element.attr('data-bind-processor');
 			if (processorKey && settings.processors)
-				var processor = settings.processors[processorKey];
+				return settings.processors[processorKey] || {};
+			else
+				return {};
+		},
 
-			var getObjValue = methods._getObjValue.bind(null, settings.data, objKey);
-			var setObjValue = methods._setObjValue.bind(null, settings.data, objKey);
+		_modelToViewValue: function(element, settings, objKey, overriddenModelValue){
+			var processor = methods._getProcessor(element, settings).modelToView;
+
+			if (typeof(overriddenModelValue) != 'undefined')
+				var val = overriddenModelValue;
+			else
+				val = methods._getObjValue(settings.data, objKey);
 
 			if (processor) {
 				// use processor
 				return processor(
 					element,
-					getObjValue,
-					setObjValue,
-					elementValueToUpdateModel
+					val
 				);
 			} else {
-				// no processor specified
-				if (typeof (elementValueToUpdateModel) != 'undefined')
-					setObjValue(elementValueToUpdateModel);
-				else
-					return getObjValue();
+				return val;
 			}
+		},
+
+		_viewToModelValue: function(element, settings, objKey, elementValueToUpdateModel){
+			var $boundCurrent = $(element);
+			var processor = methods._getProcessor(element, settings).viewToModel;
+
+			if (processor) {
+				// use processor
+				return processor(
+					element,
+					elementValueToUpdateModel
+				);
+			} else
+				return elementValueToUpdateModel;
 		},
 
 		_linkElement: function(element, settings, $boundAll){
@@ -208,14 +224,15 @@
 				}
 			}
 
-			function updateModel(val) {
+			function updateModel(elementValue) {
 				if (settings.blocks[objKey]) {
-						delete settings.blocks[objKey];
+					delete settings.blocks[objKey];
 				} else {
 					settings.blocks[objKey] = true;
-					methods._processValue(element, settings, objKey, val);
+					var newModelValue = methods._viewToModelValue(element, settings, objKey, elementValue);
+					methods._setObjValue(settings.data, objKey, newModelValue);
 					if ($.isFunction(settings.onDataUpdate))
-						settings.onDataUpdate(element, objKey, val);
+						settings.onDataUpdate(element, objKey, elementValue);
 				}
 			}
 
@@ -223,15 +240,12 @@
 				if (settings.blocks[objKey]) {
 					delete settings.blocks[objKey];
 				} else {
-					setTimeout(function () {
-							settings.blocks[objKey] = true;
-							var val = methods._processValue(element, settings, objKey);
-							methods._updateElementValue(element, val, $boundAll);
-							if ($.isFunction(settings.onViewUpdate))
-								settings.onViewUpdate(element, objKey, newVal);
-							settings.blocks[objKey] = false;
-						}, 1
-					);
+					settings.blocks[objKey] = true;
+					var val = methods._modelToViewValue(element, settings, objKey, newVal);
+					methods._updateElementValue(element, val, $boundAll);
+					settings.blocks[objKey] = false;
+					if ($.isFunction(settings.onViewUpdate))
+						settings.onViewUpdate(element, objKey, newVal);
 				}
 				return newVal;
 			});
@@ -285,8 +299,8 @@
 			var path = pathStr.split('.');
 			var lastKey = path[path.length-1];
 			for (var i = 0, cnt = path.length; i < cnt-1; i++){
-				if (!obj)
-					break;
+				if (!obj[path[i]])
+					obj[path[i]] = {};
 				obj = obj[path[i]];
 			}
 			obj[lastKey] = value;
@@ -299,11 +313,14 @@
 			var path = pathStr.split('.');
 			var lastKey = path[path.length - 1];
 			for (var i = 0, cnt = path.length; i < cnt - 1; i++) {
-				if (!obj)
-					break;
+				if (!obj[path[i]])
+					obj[path[i]] = {};
 				obj = obj[path[i]];
 			}
-			obj.watch(lastKey, setter);
+			if (typeof(obj) == 'object')
+				obj.watch(lastKey, setter);
+			else
+				$.error('Object not found at pathStr: '+pathStr);
 		},
 
 		_removeObjValueSetter: function(settings, pathStr){
